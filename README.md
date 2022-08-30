@@ -1,2 +1,2 @@
 # E209-LAB
-E209
+Laboratório de Sistema Microcontrolados e Microprocessadores
