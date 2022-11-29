@@ -1,8 +1,7 @@
-//https://www.tinkercad.com/things/hZqoNlrwGBy?sharecode=-vneJ2BGAe2DPWQsmVp1XpGunDUv6IlcUKnUxGI_pug
+
 #include<Arduino.h>
 #include<stdio.h>
 #include<stdlib.h>
-
 
 #define BIT0 0b00000001
 #define BIT1 0b00000010
@@ -37,9 +36,9 @@ void UART_Init(unsigned int ubrr){
   UBRR0H = (unsigned char)(ubrr >> 8);
   UBRR0L = (unsigned char)ubrr;
   
-  UCSR0B = (1 << RXEN0) | (1 << TXEN0) | (1 << RXCIE0); //BIT 7 + BIT 4 + BIT 3
+  UCSR0B = (1 << RXEN0) | (1 << TXEN0) | (1 << RXCIE0);
   
-  UCSR0C = (1 << UCSZ01) | (1 << UCSZ00); //BIT2 + BIT 1
+  UCSR0C = (1 << UCSZ01) | (1 << UCSZ00);
   
 }
 
@@ -47,7 +46,7 @@ void UART_Transmit(char *dados){
   
   while(*dados != 0)
   {
-    while(!(UCSR0A & (1 << UDRE0))); //BIT5
+    while(!(UCSR0A & (1 << UDRE0)));
     
     UDR0 = *dados;
     
@@ -75,33 +74,42 @@ void ADC_init(void){
   ADMUX = (1 << REFS0); //DETERMINA A TENSAO DE REFERENCIA
   
   ADCSRA = (1 << ADEN) | (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0);  
-  //ADCSRB = 0;
   //ADEN = HABILITA ADC
   //ADPS CONFIGURA O PRESCALER //PRESCALER = 128
 }
 
-int ADC_read(){
+int ADC_read(u8 ch){
   
-  unsigned int leitura_AD;
-  float tensao;
-  int pino = 1;
-
-  ADMUX = ((ADMUX & 0xF8) | pino);
-
-  unsigned int SomaLeitura = 0, MediaLeitura;
-  for (int i = 0; i < 10; i++)
-  {
-    ADCSRA |= BIT6;
-    while ((ADCSRA & BIT6) == BIT6)
-      ;
-
-    leitura_AD = (ADCL | (ADCH << 8)); // Ou leitura_AD = ADC;
-    SomaLeitura += leitura_AD;
+  char i; //VARIAVEL AUXILIAR
+  int ADC_tempo = 0; //VARIAVEL DE TEMPO
+  int ADC_read = 0; //VARIAVEL DE LEITURA
+  ch &= 0x07; //HEXADECIMAL 7
+  
+  ADMUX = (ADMUX & 0xF8) | ch; //Determinação do pino de leitura do conversor AD
+  
+  ADCSRA |= (1 << ADSC); //Inicia a conversão e indica se a conversão foi finalizada;
+  
+  while(!(ADCSRA & (1 << ADIF))); //FLAG DE INTERRUPÇAO - enquanto nao finaliza a conversao, nao inicia a interrupcao
+  
+  for(int i=0; i<8; i++){
+    
+    ADCSRA |= (1 << ADSC);
+    while(!(ADCSRA & (1 << ADIF)));
+    
+    //Leitura do Conversor AD
+    
+    ADC_tempo = ADCL; 
+    
+    ADC_tempo += (ADCH << 8);
+    
+    ADC_read += ADC_tempo;
+    
   }
-  MediaLeitura = SomaLeitura / 10;
-  tensao = (MediaLeitura * 5) / 1023.0; // Variável auxiliar para o cálculo
   
-} 
+  ADC_read = ADC_read >> 3;
+  return ADC_read;
+  
+}
 
 // -------FIM DA CONFIGURACAO ADC---------
 
@@ -155,7 +163,6 @@ ISR(INT0_vect){
 void setup(){
   
   ADC_init();
-  UART_Init(MYUBRR);
   
   setupTimer();   
   setupSensor();
@@ -165,64 +172,58 @@ void setup(){
   PORTD &= ~(BIT3); //EMERGENCIA
   PORTD &= ~(BIT6); //MOTOR
   
+  UART_Init(MYUBRR);
+  
   sei();
   
   DDRB |= (1 << PB0);
-
 }
+
   // Logica do problema
 void loop(){
-    
-  	int interruptor = (PINB & BIT0);
-    int rotacao =  ADC_read()/4;
-    porcentagem = (100*rotacao)/255;
+  u16 adc_result0;
+  adc_result0 = ADC_read(ADC0D);
+  int rotacao =  adc_result0/4;
+  porcentagem = (100*rotacao)/255;
 
-    if((interruptor) == BIT0){
+  if((PINB & (1 << PB0))){
 
-      ligado = false;
-      botao2 = true;
-      contador = true;
-    }
-    else if(msg_rx[0] == 'D'){
-      ligado = false;
-      contador = true;
-    }
-    else if((!(interruptor)== BIT0) && (msg_rx[0] == 'L')){
+    ligado = false;
+    botao2 = true;
+    contador = true;
+  }
+  else if(msg_rx[0] == 'D'){
+    ligado = false;
+    contador = true;
+  }
+  else if(!(PINB & (1 << PB0)) && (msg_rx[0] == 'L' || msg_rx[0] == 'R')){
 
-      ligado = true;
-      botao2 = false;
-    }
-  	
+    ligado = true;
+    botao2 = false;
+  }
 
-    if(ligado){
+  if(ligado){
 
-      PORTD |= BIT5;
+    PORTD |= BIT5;
+    PORTD &= ~(BIT4);
+    PORTD &= ~(BIT3);
+    OCR0A = rotacao;
+  }
+  else{
+
+    if(botao2){
+      PORTD |= BIT3;
+      PORTD &= ~(BIT5);
       PORTD &= ~(BIT4);
-      PORTD &= ~(BIT3);
-      OCR0A = rotacao;
     }
     else{
-      
-      if(botao2){
-        PORTD |= BIT3;
-        PORTD &= ~(BIT5);
-        PORTD &= ~(BIT4);
-        if((PINB & BIT0) == 0){
-          PORTD &= ~(BIT3);
-          PORTD |= BIT4;
-        }
-        else{
-          PORTD |= BIT3;
-        }
-      }
-      else{
-        PORTD |= BIT4;
-        PORTD &= ~(BIT5);
-        PORTD &= ~(BIT3);
-      }
-      OCR0A = 0;
+      PORTD |= BIT4;
+      PORTD &= ~(BIT5);
+      PORTD &= ~(BIT3);
     }
-
-    msg_rx[0] = ' ';
-    _delay_ms(100);
+    OCR0A = 0;
   }
+
+  msg_rx[0] = ' ';
+  _delay_ms(100);
+}
