@@ -8,8 +8,8 @@
       "args": [],
       "stopAtEntry": false,
       "externalConsole": true,
-      "cwd": "c:/Users/Lucas de Martha/Desktop/E209-LAB/Relatorio3",
-      "program": "c:/Users/Lucas de Martha/Desktop/E209-LAB/Relatorio3/build/Debug/outDebug",
+      "cwd": "c:/Users/Lucas de Martha/Desktop/E209-LAB/Projeto Final",
+      "program": "c:/Users/Lucas de Martha/Desktop/E209-LAB/Projeto Final/build/Debug/outDebug",
       "MIMode": "gdb",
       "miDebuggerPath": "C:/Program Files (x86)/Falcon/MinGW/bin/gdb.exe",
       "setupCommands": [
